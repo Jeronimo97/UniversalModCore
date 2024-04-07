@@ -2,6 +2,7 @@ package cam72cam.mod.event;
 
 import cam72cam.mod.ModCore;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityType;
@@ -20,6 +21,8 @@ import net.minecraftforge.event.level.ChunkEvent;
 import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegisterEvent;
 import net.minecraftforge.registries.RegisterEvent.RegisterHelper;
@@ -56,7 +59,7 @@ public class CommonEvents {
 
     public static final class Item {
         public static final Event<Consumer<RegisterHelper<net.minecraft.world.item.Item>>> REGISTER = new Event<>();
-        public static final Event<Consumer<RegisterHelper<CreativeModeTab>>> CREATIVE_TAB = new Event<>();
+        public static final DeferredRegister<CreativeModeTab> CREATIVE_TAB = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, ModCore.MODID);
     }
 
     public static final class Recipe {

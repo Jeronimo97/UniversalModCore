@@ -3,17 +3,21 @@ package cam72cam.mod.item;
 import cam72cam.mod.ModCore;
 import cam72cam.mod.event.ClientEvents;
 import cam72cam.mod.event.CommonEvents;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTab;
+import net.minecraftforge.registries.DeferredRegister;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
 /** Creates/Registers a creative tab for custom items */
+
 public class CreativeTab {
     public CreativeModeTab internal;
+
 
     // TODO expose existing creative tabs as constants to be used by mods
 
@@ -21,7 +25,7 @@ public class CreativeTab {
 
     /** */
     public CreativeTab(String label, Supplier<ItemStack> stack) {
-        CommonEvents.Item.CREATIVE_TAB.subscribe(event -> {
+        CommonEvents.Item.CREATIVE_TAB.register(label, () -> {
             CreativeModeTab.Builder builder = CreativeModeTab.builder();
             builder.title(Component.literal(label));
             builder.icon(() -> stack.get().internal());
@@ -34,7 +38,7 @@ public class CreativeTab {
             });
 
             internal = builder.build();
-            event.register(new ResourceLocation(ModCore.MODID, label), internal);
+            return internal;
         });
     }
 

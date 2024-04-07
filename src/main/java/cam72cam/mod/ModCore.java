@@ -111,6 +111,7 @@ public class ModCore {
         FMLJavaModLoadingContext.get().getModEventBus().addListener(this::postInit);
         //FMLJavaModLoadingContext.get().getModEventBus().addListener(this::serverStarting);
         //FMLJavaModLoadingContext.get().getModEventBus().addListener(this::serverStarted);
+        CommonEvents.Item.CREATIVE_TAB.register(FMLJavaModLoadingContext.get().getModEventBus());
 
         MinecraftForge.EVENT_BUS.register(this);
     }
