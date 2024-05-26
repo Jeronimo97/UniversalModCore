@@ -18,17 +18,16 @@ import cam72cam.mod.math.Vec3d;
 import cam72cam.mod.math.Vec3i;
 import cam72cam.mod.util.Facing;
 import cam72cam.mod.serialization.TagCompound;
+import cam72cam.mod.util.FastContainsList;
 import net.minecraft.block.*;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
-import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.math.AxisAlignedBB;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraftforge.common.IPlantable;
@@ -68,6 +67,11 @@ public class World {
         internal = world;
         isClient = world.isRemote;
         isServer = !world.isRemote;
+        if (isServer) {
+            if (!(world.loadedTileEntityList instanceof FastContainsList)) {
+                world.loadedTileEntityList = new FastContainsList<>(world.loadedTileEntityList, new HashSet<>());
+            }
+        }
     }
 
     /** Helper function to get a world map (client or server) */
