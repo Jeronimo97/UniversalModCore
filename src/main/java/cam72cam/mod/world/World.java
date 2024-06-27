@@ -445,7 +445,6 @@ public class World {
 
     /** Drop a stack on the ground at pos */
     public void dropItem(ItemStack stack, Vec3d pos) {
-        internal.spawnEntity(new EntityItem(internal, pos.x, pos.y, pos.z, stack.internal));
         dropItem(stack, pos, Vec3d.ZERO);
     }
 
