@@ -45,6 +45,15 @@ public class OBJRender extends VBO {
             }
         }
 
+        public void draw(Consumer<RenderState> mod) {
+            if (!isLoaded()) {
+                return;
+            }
+            try (With pus = super.push(mod)) {
+                draw();
+            }
+        }
+
         /**
          * Draw these groups in the VB
          */

@@ -1,5 +1,6 @@
 package cam72cam.mod.net;
 
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -113,6 +114,8 @@ public abstract class Packet {
 		net.sendTo(new Message(this), (EntityPlayerMP) player.internal);
 	}
 
+    protected byte[] raw;
+
     /** Forge message construct.  Do not use directly */
     public static class Message implements IMessage {
         Packet packet;
@@ -131,6 +134,9 @@ public abstract class Packet {
             String cls = data.getString("cam72cam.mod.pktid");
             packet = types.get(cls).get();
             packet.data = data;
+
+            packet.raw = new byte[buf.readInt()];
+            buf.readBytes(packet.raw);
         }
 
         @Override
@@ -143,6 +149,13 @@ public abstract class Packet {
                 ModCore.catching(e);
             }
             ByteBufUtils.writeTag(buf, data.internal);
+
+            if (packet.raw != null) {
+                buf.writeInt(packet.raw.length);
+                buf.writeBytes(packet.raw);
+            } else {
+                buf.writeInt(0);
+            }
         }
     }
 
