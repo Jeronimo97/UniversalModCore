@@ -1,15 +1,34 @@
 package cam72cam.mod.entity;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.tuple.Pair;
+
 import cam72cam.mod.ModCore;
 import cam72cam.mod.entity.boundingbox.BoundingBox;
 import cam72cam.mod.entity.boundingbox.IBoundingBox;
-import cam72cam.mod.entity.custom.*;
+import cam72cam.mod.entity.custom.IClickable;
+import cam72cam.mod.entity.custom.ICollision;
+import cam72cam.mod.entity.custom.IKillable;
+import cam72cam.mod.entity.custom.IRidable;
+import cam72cam.mod.entity.custom.ITickable;
+import cam72cam.mod.entity.custom.IWorldData;
 import cam72cam.mod.entity.sync.TagSync;
 import cam72cam.mod.item.ClickResult;
 import cam72cam.mod.math.Vec3d;
 import cam72cam.mod.math.Vec3i;
 import cam72cam.mod.net.Packet;
-import cam72cam.mod.serialization.*;
+import cam72cam.mod.serialization.SerializationException;
+import cam72cam.mod.serialization.TagCompound;
+import cam72cam.mod.serialization.TagField;
+import cam72cam.mod.serialization.TagMapper;
+import cam72cam.mod.serialization.TagSerializer;
 import cam72cam.mod.util.SingleCache;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.Entity;
@@ -23,12 +42,8 @@ import net.minecraftforge.fml.common.network.ByteBufUtils;
 import net.minecraftforge.fml.common.registry.IEntityAdditionalSpawnData;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
-import org.apache.commons.lang3.tuple.Pair;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
-/** Internal class which extends MC's Entity.  Do not use directly */
+/** Internal class which extends MC's Entity. Do not use directly */
 public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
     // Reference to the entity that this is representing
     private CustomEntity self;
@@ -51,22 +66,24 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
     private IRidable iRidable;
     private ICollision iCollision;
 
-    private final SingleCache<IBoundingBox, AxisAlignedBB> cachedCollisionBB = new SingleCache<>(BoundingBox::from);
-    private final SingleCache<IBoundingBox, AxisAlignedBB> cachedRenderBB = new SingleCache<>(internal -> {
-        AxisAlignedBB bb = BoundingBox.from(internal);
-        /*
-         So why do we wrap this with a new AABB here instead of passing the BB straight through?
-         Good question
-         Certain mods (like IR) use custom bounding boxes that do some really funky shit to break
-         the axis constraint.  We don't care about that when rendering, just want a worst-case sized BB
-        */
-        return new AxisAlignedBB(bb.minX, bb.minY, bb.minZ, bb.maxX, bb.maxY, bb.maxZ);
-    });
+    private final SingleCache<IBoundingBox, AxisAlignedBB> cachedCollisionBB =
+            new SingleCache<>(BoundingBox::from);
+    private final SingleCache<IBoundingBox, AxisAlignedBB> cachedRenderBB =
+            new SingleCache<>(internal -> {
+                AxisAlignedBB bb = BoundingBox.from(internal);
+                /*
+                 * So why do we wrap this with a new AABB here instead of passing the BB
+                 * straight through? Good question Certain mods (like IR) use custom bounding
+                 * boxes that do some really funky shit to break the axis constraint. We don't
+                 * care about that when rendering, just want a worst-case sized BB
+                 */
+                return new AxisAlignedBB(bb.minX, bb.minY, bb.minZ, bb.maxX, bb.maxY, bb.maxZ);
+            });
 
     Pair<String, TagCompound> refusedToJoin = null;
 
     /** Standard forge constructor */
-    public ModdedEntity(World world) {
+    public ModdedEntity(final World world) {
         super(world);
 
         super.preventEntitySpawning = true;
@@ -76,8 +93,11 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
     protected final void entityInit() {
     }
 
-    /** Setup self if we have not done so already.  This happens during entity data load. */
-    protected final void initSelf(String type) {
+    /**
+     * Setup self if we have not done so already. This happens during entity data
+     * load.
+     */
+    protected final void initSelf(final String type) {
         if (self == null) {
             this.type = type;
             self = EntityRegistry.create(type, this);
@@ -102,23 +122,23 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
 
     /** @see #load */
     @Override
-    protected final void readEntityFromNBT(NBTTagCompound compound) {
+    protected final void readEntityFromNBT(final NBTTagCompound compound) {
         load(new TagCompound(compound));
     }
 
     /**
      * Deserializes data into this, self, and calls self.load.
+     * 
      * @see IWorldData
      */
-    private void load(TagCompound data) {
+    private void load(final TagCompound data) {
         String type = data.getString("custom_mob_type");
         if (type == null) {
             // Legacy...
             type = data.getString("id");
         }
-        if (type == null) {
+        if (type == null)
             throw new RuntimeException("Invalid entity data: " + data);
-        }
         // Setup self construct (if not done so already)
         initSelf(type);
 
@@ -131,7 +151,8 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
 
         TagCompound selfData = data.get("selfData");
         if (selfData == null) {
-            // Old style used to save everything in one giant NBT blob.  New versions save self in a sub tag.
+            // Old style used to save everything in one giant NBT blob. New versions save
+            // self in a sub tag.
             selfData = data;
         }
 
@@ -151,16 +172,17 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
 
     /** @see #save */
     @Override
-    protected final void writeEntityToNBT(NBTTagCompound compound) {
+    protected final void writeEntityToNBT(final NBTTagCompound compound) {
         save(new TagCompound(compound));
     }
 
     /**
      * Inverse of load
+     * 
      * @see IWorldData
      * @see #load
      */
-    private void save(TagCompound data) {
+    private void save(final TagCompound data) {
         data.setString("custom_mob_type", type);
         try {
             TagSerializer.serialize(data, this);
@@ -188,11 +210,10 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
 
     /** @see #load */
     @Override
-    public final void readSpawnData(ByteBuf additionalData) {
-        if (cam72cam.mod.world.World.get(world) == null) {
+    public final void readSpawnData(final ByteBuf additionalData) {
+        if (cam72cam.mod.world.World.get(world) == null)
             // This can happen during a sudden disconnect...
             return;
-        }
         TagCompound data = new TagCompound(ByteBufUtils.readTag(additionalData));
         load(data);
         try {
@@ -203,7 +224,7 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
     }
 
     @Override
-    public final void writeSpawnData(ByteBuf buffer) {
+    public final void writeSpawnData(final ByteBuf buffer) {
         TagCompound data = new TagCompound();
         TagCompound sync = new TagCompound();
         try {
@@ -219,7 +240,8 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
     /* ITickable */
 
     /**
-     * Hooks into #ITickable and runs server/client data synchronization.  Also does some seat management.
+     * Hooks into #ITickable and runs server/client data synchronization. Also does
+     * some seat management.
      *
      * @see ITickable
      */
@@ -241,16 +263,19 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
     /* Player Interact */
     /** @see IClickable */
     @Override
-    public final boolean processInitialInteract(EntityPlayer player, EnumHand hand) {
-        return iClickable.onClick(new Player(player), Player.Hand.from(hand)) == ClickResult.ACCEPTED;
+    public final boolean processInitialInteract(final EntityPlayer player, final EnumHand hand) {
+        return iClickable.onClick(new Player(player),
+                Player.Hand.from(hand)) == ClickResult.ACCEPTED;
     }
 
     /* Death */
 
     /** @see IKillable */
     @Override
-    public final boolean attackEntityFrom(DamageSource damagesource, float amount) {
-        cam72cam.mod.entity.Entity wrapEnt = damagesource.getTrueSource() != null ? self.getWorld().getEntity(damagesource.getTrueSource()) : null;
+    public final boolean attackEntityFrom(final DamageSource damagesource, final float amount) {
+        cam72cam.mod.entity.Entity wrapEnt = damagesource.getTrueSource() != null
+                ? self.getWorld().getEntity(damagesource.getTrueSource())
+                : null;
         DamageType type;
         if (damagesource.isExplosion()) {
             type = DamageType.EXPLOSION;
@@ -280,36 +305,39 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
     /* Ridable */
     /** @see IRidable#canFitPassenger */
     @Override
-    public boolean canFitPassenger(Entity passenger) {
+    public boolean canFitPassenger(final Entity passenger) {
         return iRidable.canFitPassenger(self.getWorld().getEntity(passenger));
     }
 
     /** Passenger offset from entity center rotated by entity yaw */
-    private Vec3d calculatePassengerOffset(cam72cam.mod.entity.Entity passenger) {
-        return passenger.getPosition().subtract(self.getPosition()).rotateYaw(self.getRotationYaw());
+    private Vec3d calculatePassengerOffset(final cam72cam.mod.entity.Entity passenger) {
+        return passenger.getPosition().subtract(self.getPosition())
+                .rotateYaw(self.getRotationYaw());
     }
 
     /** Rotate offset around entity center by entity yaw and add entity center */
-    private Vec3d calculatePassengerPosition(Vec3d offset) {
+    private Vec3d calculatePassengerPosition(final Vec3d offset) {
         return offset.rotateYaw(-self.getRotationYaw()).add(self.getPosition());
     }
 
     /**
-     * Don't actually add passengers to the Entity, add a seat which follows the entity instead.
+     * Don't actually add passengers to the Entity, add a seat which follows the
+     * entity instead.
      *
      * Only functions on the server.
      *
      * @see IRidable#getMountOffset
      */
     @Override
-    public final void addPassenger(Entity entity) {
+    public final void addPassenger(final Entity entity) {
         if (!world.isRemote) {
             SeatEntity seat = new SeatEntity(world);
             seat.setup(this, entity);
             cam72cam.mod.entity.Entity passenger = self.getWorld().getEntity(entity);
-            passengerPositions.put(entity.getPersistentID(), iRidable.getMountOffset(passenger, calculatePassengerOffset(passenger)));
+            passengerPositions.put(entity.getPersistentID(),
+                    iRidable.getMountOffset(passenger, calculatePassengerOffset(passenger)));
             entity.startRiding(seat);
-            //updateSeat(seat); Don't do this here, can cause StackOverflow
+            // updateSeat(seat); Don't do this here, can cause StackOverflow
             world.spawnEntity(seat);
             new PassengerPositionsPacket(this).sendToObserving(self);
         }
@@ -317,21 +345,20 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
 
     /**
      * Returns passengers that are riding via seats
+     * 
      * @see CustomEntity#getPassengers
      */
     List<cam72cam.mod.entity.Entity> getActualPassengers() {
-        return seats.stream()
-                .map(SeatEntity::getEntityPassenger)
-                .filter(Objects::nonNull)
+        return seats.stream().map(SeatEntity::getEntityPassenger).filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
     /**
      * Helper function that updates a seat's position and it's rider's position
      * 
-     * @see SeatEntity#updatePassenger 
+     * @see SeatEntity#updatePassenger
      */
-    void updateSeat(SeatEntity seat) {
+    void updateSeat(final SeatEntity seat) {
         if (!seats.contains(seat)) {
             seats.add(seat);
         }
@@ -345,16 +372,20 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
                 passengerPositions.put(passenger.getUUID(), offset);
             }
 
+            System.out.println("Seat: " + seat);
+            System.out.println("Passenger: " + passenger);
+            System.out.println("Offset before: " + offset);
             offset = iRidable.onPassengerUpdate(passenger, offset);
-            if (!seat.isPassenger(passenger.internal)) {
+            System.out.println("Offset: " + offset);
+            if (!seat.isPassenger(passenger.internal))
                 return;
-            }
 
             passengerPositions.put(passenger.getUUID(), offset);
 
             Vec3d pos = calculatePassengerPosition(offset);
 
-            if (world.loadedEntityList.indexOf(seat) < world.loadedEntityList.indexOf(passenger.internal)) {
+            if (world.loadedEntityList.indexOf(seat) < world.loadedEntityList
+                    .indexOf(passenger.internal)) {
                 pos = pos.add(motionX, motionY, motionZ);
             }
 
@@ -369,11 +400,12 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
     }
 
     /** @see CustomEntity#isPassenger */
-    boolean isPassenger(cam72cam.mod.entity.Entity passenger) {
-        return getActualPassengers().stream().anyMatch(p -> p.getUUID().equals(passenger.getUUID()));
+    boolean isPassenger(final cam72cam.mod.entity.Entity passenger) {
+        return getActualPassengers().stream()
+                .anyMatch(p -> p.getUUID().equals(passenger.getUUID()));
     }
 
-    public void moveRiderTo(cam72cam.mod.entity.Entity entity, CustomEntity other) {
+    public void moveRiderTo(final cam72cam.mod.entity.Entity entity, final CustomEntity other) {
         if (other.internal.iRidable.canFitPassenger(entity)) {
             SeatEntity seat = (SeatEntity) entity.internal.getRidingEntity();
             this.seats.remove(seat);
@@ -390,7 +422,7 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
      * @see IRidable#onDismountPassenger
      * @see SeatEntity#removePassenger
      */
-    void removeSeat(SeatEntity seat) {
+    void removeSeat(final SeatEntity seat) {
         cam72cam.mod.entity.Entity passenger = seat.getEntityPassenger();
         if (passenger != null) {
             Vec3d offset = passengerPositions.get(passenger.getUUID());
@@ -401,7 +433,8 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
 
                 Vec3d adjusted = pos;
                 for (int i = 0; i < 6; i++) {
-                    if (world.isAirBlock(new Vec3i(adjusted).internal()) && world.isAirBlock(new Vec3i(adjusted).up().internal())) {
+                    if (world.isAirBlock(new Vec3i(adjusted).internal())
+                            && world.isAirBlock(new Vec3i(adjusted).up().internal())) {
                         pos = adjusted;
                         break;
                     }
@@ -415,7 +448,7 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
     }
 
     /** @see CustomEntity#removePassenger */
-    void removePassenger(cam72cam.mod.entity.Entity passenger) {
+    void removePassenger(final cam72cam.mod.entity.Entity passenger) {
         for (SeatEntity seat : this.seats) {
             cam72cam.mod.entity.Entity seatPass = seat.getEntityPassenger();
             if (seatPass != null && seatPass.getUUID().equals(passenger.getUUID())) {
@@ -443,22 +476,24 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
     }
 
     /**
-     * Only generates a new BB object when the underlying self.getCollision() changes
+     * Only generates a new BB object when the underlying self.getCollision()
+     * changes
      *
      * @see ICollision
      */
     @Override
     public AxisAlignedBB getEntityBoundingBox() {
-        if (refusedToJoin != null) {
+        if (refusedToJoin != null)
             // Entity is added to a chunk but not world (yay minecraft)
             return super.getEntityBoundingBox();
-        }
         return cachedCollisionBB.get(iCollision.getCollision());
     }
 
     /**
-     * Only generates a new BB object when the underlying self.getCollision() changes
-     * TODO provide a way of specifying a render bounding box without a collision bounding box
+     * Only generates a new BB object when the underlying self.getCollision()
+     * changes TODO provide a way of specifying a render bounding box without a
+     * collision bounding box
+     * 
      * @see ICollision
      */
     @Override
@@ -480,14 +515,17 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
 
     @Override
     @SideOnly(Side.CLIENT)
-    public void setPositionAndRotationDirect(double x, double y, double z, float yaw, float pitch, int posRotationIncrements, boolean teleport) {
+    public void setPositionAndRotationDirect(final double x, final double y, final double z,
+            final float yaw, final float pitch, final int posRotationIncrements,
+            final boolean teleport) {
         if (self.allowsDefaultMovement()) {
-            super.setPositionAndRotationDirect(x, y, z, yaw, pitch, posRotationIncrements, teleport);
+            super.setPositionAndRotationDirect(x, y, z, yaw, pitch, posRotationIncrements,
+                    teleport);
         }
     }
 
     @Override
-    public void setVelocity(double x, double y, double z) {
+    public void setVelocity(final double x, final double y, final double z) {
         if (self.allowsDefaultMovement()) {
             super.setVelocity(x, y, z);
         }
@@ -499,16 +537,17 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
     }
 
     /*
-    Passenger helpers
+     * Passenger helpers
      */
 
     private static class PassengerMapper implements TagMapper<Map<UUID, Vec3d>> {
         @Override
-        public TagAccessor<Map<UUID, Vec3d>> apply(Class<Map<UUID, Vec3d>> type, String fieldName, TagField tag) {
+        public TagAccessor<Map<UUID, Vec3d>> apply(final Class<Map<UUID, Vec3d>> type,
+                final String fieldName, final TagField tag) {
             return new TagAccessor<>(
-                (d, o) -> d.setMap(fieldName, o, UUID::toString, (Vec3d pos) -> new TagCompound().setVec3d("pos", pos)),
-                d -> d.getMap(fieldName, UUID::fromString, t -> t.getVec3d("pos"))
-            );
+                    (d, o) -> d.setMap(fieldName, o, UUID::toString,
+                            (final Vec3d pos) -> new TagCompound().setVec3d("pos", pos)),
+                    d -> d.getMap(fieldName, UUID::fromString, t -> t.getVec3d("pos")));
         }
     }
 
@@ -519,9 +558,10 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
         @TagField(mapper = PassengerMapper.class)
         private Map<UUID, Vec3d> passengerPositions = new HashMap<>();
 
-        public PassengerPositionsPacket() {}
+        public PassengerPositionsPacket() {
+        }
 
-        public PassengerPositionsPacket(ModdedEntity target) {
+        public PassengerPositionsPacket(final ModdedEntity target) {
             this.target = target.self;
             this.passengerPositions = target.passengerPositions;
         }
@@ -541,13 +581,14 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
         @TagField
         private cam72cam.mod.entity.Entity rider;
 
-        public PassengerSeatPacket() {}
+        public PassengerSeatPacket() {
+        }
 
-        public PassengerSeatPacket(CustomEntity target, cam72cam.mod.entity.Entity rider) {
+        public PassengerSeatPacket(final CustomEntity target,
+                final cam72cam.mod.entity.Entity rider) {
             this.target = target;
             this.rider = rider;
         }
-
 
         @Override
         protected void handle() {
@@ -561,38 +602,24 @@ public class ModdedEntity extends Entity implements IEntityAdditionalSpawnData {
      * TODO!!!
      */
     /*
-    //@Override
-    public boolean hasCapability(Capability<?> capability, EnumFacing facing) {
-        if (capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY) {
-            return true;
-        }
-        return false;//super.hasCapability(energyCapability, facing);
-    }
-
-    @SuppressWarnings("unchecked")
-	//@Override
-    public <T> T getCapability(Capability<T> capability, EnumFacing facing) {
-        if (capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY) {
-            return (T) cargoItems;
-        }
-        return null;//super.getCapability(energyCapability, facing);
-    }
-
-	@Override
-    public boolean hasCapability(Capability<?> capability, EnumFacing facing) {
-        if (capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY) {
-            return true;
-        }
-        return super.hasCapability(capability, facing);
-    }
-
-    @SuppressWarnings("unchecked")
-	@Override
-    public <T> T getCapability(Capability<T> capability, EnumFacing facing) {
-        if (capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY) {
-            return (T) theTank;
-        }
-        return super.getCapability(capability, facing);
-    }
+     * //@Override public boolean hasCapability(Capability<?> capability, EnumFacing
+     * facing) { if (capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY) {
+     * return true; } return false;//super.hasCapability(energyCapability, facing);
+     * }
+     * 
+     * @SuppressWarnings("unchecked") //@Override public <T> T
+     * getCapability(Capability<T> capability, EnumFacing facing) { if (capability
+     * == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY) { return (T) cargoItems; }
+     * return null;//super.getCapability(energyCapability, facing); }
+     * 
+     * @Override public boolean hasCapability(Capability<?> capability, EnumFacing
+     * facing) { if (capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY)
+     * { return true; } return super.hasCapability(capability, facing); }
+     * 
+     * @SuppressWarnings("unchecked")
+     * 
+     * @Override public <T> T getCapability(Capability<T> capability, EnumFacing
+     * facing) { if (capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY)
+     * { return (T) theTank; } return super.getCapability(capability, facing); }
      */
 }

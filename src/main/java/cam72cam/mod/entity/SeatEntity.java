@@ -1,5 +1,7 @@
 package cam72cam.mod.entity;
 
+import java.util.UUID;
+
 import cam72cam.mod.ModCore;
 import cam72cam.mod.serialization.TagCompound;
 import cam72cam.mod.world.World;
@@ -12,8 +14,6 @@ import net.minecraftforge.fml.common.registry.IEntityAdditionalSpawnData;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
-import java.util.UUID;
-
 /** Seat construct to make multiple riders actually work */
 public class SeatEntity extends Entity implements IEntityAdditionalSpawnData {
     static final ResourceLocation ID = new ResourceLocation(ModCore.MODID, "seat");
@@ -21,7 +21,8 @@ public class SeatEntity extends Entity implements IEntityAdditionalSpawnData {
     private UUID parent;
     // What is in the seat
     private UUID passenger;
-    // If we should try to render the rider as standing or sitting (partial support!)
+    // If we should try to render the rider as standing or sitting (partial
+    // support!)
     boolean shouldSit = true;
     // If a passenger has mounted and then dismounted (if so, we can go away)
     private boolean hasHadPassenger = false;
@@ -29,7 +30,7 @@ public class SeatEntity extends Entity implements IEntityAdditionalSpawnData {
     private int ticks = 0;
 
     /** MC reflection */
-    public SeatEntity(net.minecraft.world.World worldIn) {
+    public SeatEntity(final net.minecraft.world.World worldIn) {
         super(worldIn);
     }
 
@@ -39,7 +40,7 @@ public class SeatEntity extends Entity implements IEntityAdditionalSpawnData {
     }
 
     @Override
-    protected void readEntityFromNBT(NBTTagCompound compound) {
+    protected void readEntityFromNBT(final NBTTagCompound compound) {
         TagCompound data = new TagCompound(compound);
         parent = data.getUUID("parent");
         passenger = data.getUUID("passenger");
@@ -47,7 +48,7 @@ public class SeatEntity extends Entity implements IEntityAdditionalSpawnData {
     }
 
     @Override
-    protected void writeEntityToNBT(NBTTagCompound compound) {
+    protected void writeEntityToNBT(final NBTTagCompound compound) {
         TagCompound data = new TagCompound(compound);
         data.setUUID("parent", parent);
         data.setUUID("passenger", passenger);
@@ -56,10 +57,9 @@ public class SeatEntity extends Entity implements IEntityAdditionalSpawnData {
 
     @Override
     public void onUpdate() {
-        ticks ++;
-        if (world.isRemote || ticks < 5) {
+        ticks++;
+        if (world.isRemote || ticks < 5)
             return;
-        }
 
         if (parent == null) {
             ModCore.debug("No parent, goodbye");
@@ -75,7 +75,8 @@ public class SeatEntity extends Entity implements IEntityAdditionalSpawnData {
         if (getPassengers().isEmpty()) {
             if (this.ticks < 20) {
                 if (!hasHadPassenger) {
-                    cam72cam.mod.entity.Entity toRide = World.get(world).getEntity(passenger, cam72cam.mod.entity.Entity.class);
+                    cam72cam.mod.entity.Entity toRide =
+                            World.get(world).getEntity(passenger, cam72cam.mod.entity.Entity.class);
                     if (toRide != null) {
                         ModCore.debug("FORCE RIDER");
                         toRide.internal.startRiding(this, true);
@@ -97,21 +98,21 @@ public class SeatEntity extends Entity implements IEntityAdditionalSpawnData {
         }
     }
 
-    public void setup(ModdedEntity moddedEntity, Entity passenger) {
+    public void setup(final ModdedEntity moddedEntity, final Entity passenger) {
         this.parent = moddedEntity.getUniqueID();
         this.setPosition(moddedEntity.posX, moddedEntity.posY, moddedEntity.posZ);
         this.passenger = passenger.getUniqueID();
     }
 
-    public void moveTo(ModdedEntity moddedEntity) {
+    public void moveTo(final ModdedEntity moddedEntity) {
         this.parent = moddedEntity.getUniqueID();
     }
 
     public cam72cam.mod.entity.Entity getParent() {
-        cam72cam.mod.entity.Entity linked = World.get(world).getEntity(parent, cam72cam.mod.entity.Entity.class);
-        if (linked != null && linked.internal instanceof ModdedEntity) {
+        cam72cam.mod.entity.Entity linked =
+                World.get(world).getEntity(parent, cam72cam.mod.entity.Entity.class);
+        if (linked != null && linked.internal instanceof ModdedEntity)
             return linked;
-        }
         return null;
     }
 
@@ -121,8 +122,9 @@ public class SeatEntity extends Entity implements IEntityAdditionalSpawnData {
     }
 
     @Override
-    public final void updatePassenger(net.minecraft.entity.Entity passenger) {
-        cam72cam.mod.entity.Entity linked = World.get(world).getEntity(parent, cam72cam.mod.entity.Entity.class);
+    public final void updatePassenger(final net.minecraft.entity.Entity passenger) {
+        cam72cam.mod.entity.Entity linked =
+                World.get(world).getEntity(parent, cam72cam.mod.entity.Entity.class);
         if (linked != null && linked.internal instanceof ModdedEntity) {
             ((ModdedEntity) linked.internal).updateSeat(this);
         }
@@ -134,8 +136,9 @@ public class SeatEntity extends Entity implements IEntityAdditionalSpawnData {
     }
 
     @Override
-    public final void removePassenger(net.minecraft.entity.Entity passenger) {
-        cam72cam.mod.entity.Entity linked = World.get(world).getEntity(parent, cam72cam.mod.entity.Entity.class);
+    public final void removePassenger(final net.minecraft.entity.Entity passenger) {
+        cam72cam.mod.entity.Entity linked =
+                World.get(world).getEntity(parent, cam72cam.mod.entity.Entity.class);
         if (linked != null && linked.internal instanceof ModdedEntity) {
             ((ModdedEntity) linked.internal).removeSeat(this);
         }
@@ -143,17 +146,16 @@ public class SeatEntity extends Entity implements IEntityAdditionalSpawnData {
     }
 
     public cam72cam.mod.entity.Entity getEntityPassenger() {
-        if (this.isDead) {
+        if (this.isDead)
             return null;
-        }
-        if (this.getPassengers().size() == 0) {
+        if (this.getPassengers().size() == 0)
             return null;
-        }
+        getPassengers().forEach(p -> System.out.println("Passengers: " + p));
         return World.get(world).getEntity(getPassengers().get(0));
     }
 
     @Override
-    public void writeSpawnData(ByteBuf buffer) {
+    public void writeSpawnData(final ByteBuf buffer) {
         TagCompound data = new TagCompound();
         data.setUUID("parent", parent);
         data.setUUID("passenger", passenger);
@@ -161,7 +163,7 @@ public class SeatEntity extends Entity implements IEntityAdditionalSpawnData {
     }
 
     @Override
-    public void readSpawnData(ByteBuf additionalData) {
+    public void readSpawnData(final ByteBuf additionalData) {
         TagCompound data = new TagCompound(ByteBufUtils.readTag(additionalData));
         parent = data.getUUID("parent");
         passenger = data.getUUID("passenger");
@@ -169,7 +171,7 @@ public class SeatEntity extends Entity implements IEntityAdditionalSpawnData {
 
     @Override
     @SideOnly(Side.CLIENT)
-    public boolean isInRangeToRenderDist(double distance) {
+    public boolean isInRangeToRenderDist(final double distance) {
         return false;
     }
 }
