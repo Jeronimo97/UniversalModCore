@@ -42,7 +42,7 @@ public class BlockRender {
     // BlockEntity type -> BlockEntity Renderer
     private static final Map<Class<? extends BlockEntity>, Function<BlockEntity, StandardModel>> renderers = new HashMap<>();
     // Internal hack for globally rendered TE's
-    private static List<net.minecraft.tileentity.TileEntity> prev = new ArrayList<>();
+    private static Set<net.minecraft.tileentity.TileEntity> prev = new HashSet<>();
 
     static {
         ClientEvents.TICK.subscribe(() -> {
@@ -54,13 +54,13 @@ public class BlockRender {
             Create new array to prevent CME's with poorly behaving mods
             TODO: Opt out of renderGlobal!
              */
-            List<net.minecraft.tileentity.TileEntity> tes = new ArrayList<>(Minecraft.getMinecraft().world.loadedTileEntityList).stream()
+            Set<net.minecraft.tileentity.TileEntity> tes = new ArrayList<>(Minecraft.getMinecraft().world.loadedTileEntityList).stream()
                     .filter(x -> x instanceof TileEntity && ((TileEntity) x).isLoaded() && x.getMaxRenderDistanceSquared() > 0)
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toCollection(HashSet::new));
             if (Minecraft.getMinecraft().world.getTotalWorldTime() % 20 == 1) {
                 prev = new ArrayList<>(Minecraft.getMinecraft().world.loadedTileEntityList).stream()
                         .filter(x -> x instanceof TileEntity)
-                        .collect(Collectors.toList());
+                        .collect(Collectors.toCollection(HashSet::new));
             }
             Minecraft.getMinecraft().renderGlobal.updateTileEntities(prev, tes);
             prev = tes;
