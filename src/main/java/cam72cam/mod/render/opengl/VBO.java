@@ -27,10 +27,14 @@ public class VBO {
         // free unused textures
         ClientEvents.TICK.subscribe(() -> {
             synchronized (vbos) {
+                List<VBO> toDel = new ArrayList<>();
                 for (VBO vbo : vbos) {
                     if (vbo.vbo != -1 && System.currentTimeMillis() - vbo.lastUsed > 30 * 1000) {
-                        vbo.free();
+                        toDel.add(vbo);
                     }
+                }
+                if (!toDel.isEmpty()) {
+                    toDel.forEach(VBO::free);
                 }
             }
         });
