@@ -1,21 +1,28 @@
 package cam72cam.mod.render.opengl;
 
+import java.nio.FloatBuffer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL15;
+
 import cam72cam.mod.event.ClientEvents;
 import cam72cam.mod.model.obj.VertexBuffer;
 import cam72cam.mod.util.With;
 import net.minecraft.client.renderer.GLAllocation;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL15;
-
-import java.nio.FloatBuffer;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.*;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 public class VBO {
     private static final List<VBO> vbos = new ArrayList<>();
+
     public static void registerClientEvents() {
         // free unused textures
         ClientEvents.TICK.subscribe(() -> {
@@ -37,18 +44,17 @@ public class VBO {
     private long lastUsed;
     private VertexBuffer vbInfo;
 
-    private static final ExecutorService pool = new ThreadPoolExecutor(0, Runtime.getRuntime().availableProcessors(),
-            5L, TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(),
-            runnable -> {
-                Thread thread = new Thread(runnable);
-                thread.setName("UMC-VertexBufferLoader");
-                thread.setPriority(Thread.MIN_PRIORITY);
-                return thread;
-            });
+    private static final ExecutorService pool =
+            new ThreadPoolExecutor(0, Runtime.getRuntime().availableProcessors(), 5L,
+                    TimeUnit.SECONDS, new LinkedBlockingQueue<>(), runnable -> {
+                        Thread thread = new Thread(runnable);
+                        thread.setName("UMC-VertexBufferLoader");
+                        thread.setPriority(Thread.MIN_PRIORITY);
+                        return thread;
+                    });
     private Future<FloatBuffer> loader = null;
 
-    public VBO(Supplier<VertexBuffer> buffer, Consumer<RenderState> settings) {
+    public VBO(final Supplier<VertexBuffer> buffer, final Consumer<RenderState> settings) {
         this.buffer = buffer;
         this.vbo = -1;
         this.settings = settings;
@@ -88,11 +94,11 @@ public class VBO {
         }
     }
 
-    public Binding bind(RenderState state) {
+    public Binding bind(final RenderState state) {
         return bind(state, false);
     }
 
-    public Binding bind(RenderState state, boolean waitForLoad) {
+    public Binding bind(final RenderState state, final boolean waitForLoad) {
         return new Binding(state, waitForLoad);
     }
 
@@ -104,7 +110,7 @@ public class VBO {
             return vbo != -1;
         }
 
-        protected Binding(RenderState state, boolean wait) {
+        protected Binding(final RenderState state, final boolean wait) {
             lastUsed = System.currentTimeMillis();
 
             if (!isLoaded()) {
@@ -140,7 +146,6 @@ public class VBO {
                 GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, oldVbo);
             });
 
-
             GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
             GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
             GL11.glEnableClientState(GL11.GL_COLOR_ARRAY);
@@ -153,11 +158,14 @@ public class VBO {
             GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, vbo);
 
             int stride = vbInfo.stride * Float.BYTES;
-            GL11.glVertexPointer(3, GL11.GL_FLOAT, stride, (long) vbInfo.vertexOffset * Float.BYTES);
-            GL11.glTexCoordPointer(2, GL11.GL_FLOAT, stride, (long) vbInfo.textureOffset * Float.BYTES);
+            GL11.glVertexPointer(3, GL11.GL_FLOAT, stride,
+                    (long) vbInfo.vertexOffset * Float.BYTES);
+            GL11.glTexCoordPointer(2, GL11.GL_FLOAT, stride,
+                    (long) vbInfo.textureOffset * Float.BYTES);
             GL11.glColorPointer(4, GL11.GL_FLOAT, stride, (long) vbInfo.colorOffset * Float.BYTES);
             if (vbInfo.hasNormals) {
-                GL11.glNormalPointer(GL11.GL_FLOAT, stride, (long) vbInfo.normalOffset * Float.BYTES);
+                GL11.glNormalPointer(GL11.GL_FLOAT, stride,
+                        (long) vbInfo.normalOffset * Float.BYTES);
             }
         }
 
@@ -166,12 +174,12 @@ public class VBO {
             restore.close();
         }
 
-        protected With push(Consumer<RenderState> mod) {
-            if (!isLoaded()) {
-                return () -> {};
-            }
+        protected With push(final Consumer<RenderState> mod) {
+            if (!isLoaded())
+                return () -> {
+                };
 
-            //We have to create a new RenderState for 1.16 and below
+            // We have to create a new RenderState for 1.16 and below
             RenderState state = new RenderState().stage(this.state.stage);
             mod.accept(state);
             return RenderContext.apply(state);
@@ -181,9 +189,8 @@ public class VBO {
          * Draw the entire VB
          */
         public void draw() {
-            if (!isLoaded()) {
+            if (!isLoaded())
                 return;
-            }
             GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, length);
         }
     }
@@ -195,6 +202,7 @@ public class VBO {
         synchronized (vbos) {
             if (vbo != -1) {
                 GL15.glDeleteBuffers(vbo);
+                vbos.remove(this);
                 vbo = -1;
             }
         }
